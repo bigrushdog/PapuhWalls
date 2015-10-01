@@ -4,6 +4,7 @@
     <string-array name="fullchangelog">
         <item>@array/v2</item>
         <item>@array/v21</item>
+        <item>@array/v22</item>
     </string-array>
 
     <string-array name="v2">
@@ -15,6 +16,13 @@
         <item>V2.0.1</item>
         <item>- Fixed FC with "clear cache" menu</item>
         <item>- Fixed Muzei navbar not being tinted</item>
+    </string-array>
+
+    <string-array name="v22">
+        <item>V2.0.2</item>
+        <item>- Improvements to the wall fragments</item>
+        <item>- Remove header\'s profile selection tab</item>
+        <item>- 20 new wallpapers</item>
     </string-array>
 
 </resources>
