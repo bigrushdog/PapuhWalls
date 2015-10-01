@@ -1,5 +1,6 @@
 package com.alexcruz.papuhwalls;
 
+import android.app.Activity;
 import android.app.WallpaperManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -7,13 +8,13 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Pair;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -22,12 +23,11 @@ import com.afollestad.materialdialogs.MaterialDialog;
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
 import com.github.mrengineer13.snackbar.SnackBar;
-import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
+import java.lang.ref.WeakReference;
 
 
 public class WallsFragment extends ActionBarActivity {
@@ -35,8 +35,9 @@ public class WallsFragment extends ActionBarActivity {
     private Toolbar toolbar;
     public String wall;
     private String saveWallLocation, picName, dialogContent;
+    private File destWallFile;
     private View fabBg;
-    private Context context;
+    private Activity context;
     Preferences Preferences;
 
     private static final int ACTIVITY_SHARE = 13452;
@@ -63,7 +64,7 @@ public class WallsFragment extends ActionBarActivity {
         saveWallLocation = Environment.getExternalStorageDirectory().getAbsolutePath() + context.getResources().getString(R.string.walls_save_location);
         picName = context.getResources().getString(R.string.walls_prefix_name);
 
-        dialogContent = getResources().getString(R.string.download_done) + saveWallLocation;
+        dialogContent = getResources().getString(R.string.download_done) + " " + saveWallLocation;
 
         Boolean isFirstRun = getSharedPreferences("PREFERENCE", MODE_PRIVATE)
                 .getBoolean("isfirstrun", true);
@@ -80,25 +81,19 @@ public class WallsFragment extends ActionBarActivity {
 
         }
 
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        setFullScreen();
+
         scan(this, "external");
 
         fabBg = findViewById(R.id.fabBg);
 
         ImageView image = (ImageView) findViewById(R.id.bigwall);
         wall = getIntent().getStringExtra("wall");
+        destWallFile = new File(saveWallLocation + "/" + picName + convertWallName(wall) + ".png");
+
         Picasso.with(this)
                 .load(wall)
-                .into(image, new Callback.EmptyCallback() {
-                            @Override
-                            public void onSuccess() {
-                            }
-                        }
-                );
+                .into(image);
 
         final FloatingActionsMenu wallsFab = (FloatingActionsMenu) findViewById(R.id.wall_actions);
         wallsFab.setOnFloatingActionsMenuUpdateListener(new FloatingActionsMenu.OnFloatingActionsMenuUpdateListener() {
@@ -120,7 +115,27 @@ public class WallsFragment extends ActionBarActivity {
         setWall.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                showSetWallDialog();
+
+                new DownloadBitmap(context, wall, destWallFile, new Callback<Pair<Uri, Bitmap>>() {
+                    @Override
+                    public void callback(Pair<Uri, Bitmap> object) {
+                        try {
+                            WallpaperManager wm = WallpaperManager.getInstance(context);
+                            wm.setBitmap(object.second);
+
+                            new SnackBar.Builder(context)
+                                    .withMessageId(R.string.set_as_wall_done)
+                                    .withActionMessageId(R.string.ok)
+                                    .withStyle(SnackBar.Style.ALERT)
+                                    .withDuration(SnackBar.SHORT_SNACK)
+                                    .show();
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }).execute();
+
             }
         });
 
@@ -131,11 +146,27 @@ public class WallsFragment extends ActionBarActivity {
             @Override
             public void onClick(View view) {
 
-                Picasso.with(context)
-                        .load(wall)
-                        .into(target);
+                new DownloadBitmap(context, wall, destWallFile, new Callback<Pair<Uri, Bitmap>>() {
+                    @Override
+                    public void callback(Pair<Uri, Bitmap> object) {
 
-                showDownloadDialog(false);
+                        MaterialDialog dialog = new MaterialDialog.Builder(context)
+                                .title(getString(R.string.done))
+                                .content(dialogContent)
+                                .dismissListener(new DialogInterface.OnDismissListener() {
+                                    @Override
+                                    public void onDismiss(DialogInterface dialog) {
+                                        setFullScreen();
+                                    }
+                                })
+                                .build();
+
+                        dialog.setActionButton(DialogAction.NEGATIVE, R.string.close);
+                        dialog.show();
+
+                    }
+                }).execute();
+
             }
         });
 
@@ -146,10 +177,16 @@ public class WallsFragment extends ActionBarActivity {
             @Override
             public void onClick(View view) {
 
-                Picasso.with(context)
-                        .load(wall)
-                        .into(wallCropTarget);
-                waitOnConnectedDialog();
+                new DownloadBitmap(context, wall, destWallFile, new Callback<Pair<Uri, Bitmap>>() {
+                    @Override
+                    public void callback(Pair<Uri, Bitmap> object) {
+                        Intent setWall = new Intent(Intent.ACTION_ATTACH_DATA);
+                        setWall.setDataAndType(object.first, "image/*");
+                        setWall.putExtra("png", "image/*");
+                        startActivityForResult(Intent.createChooser(setWall, getString(R.string.set_as)), 1);
+                    }
+                }).execute();
+
             }
         });
 
@@ -160,10 +197,16 @@ public class WallsFragment extends ActionBarActivity {
             @Override
             public void onClick(View view) {
 
-                Picasso.with(context)
-                        .load(wall)
-                        .into(wallEditTarget);
-                waitOnConnectedDialog();
+                new DownloadBitmap(context, wall, destWallFile, new Callback<Pair<Uri, Bitmap>>() {
+                    @Override
+                    public void callback(Pair<Uri, Bitmap> object) {
+                        Intent editWall = new Intent(Intent.ACTION_EDIT);
+                        editWall.setDataAndType(object.first, "image/*");
+                        editWall.putExtra("png", "image/*");
+                        startActivityForResult(Intent.createChooser(editWall, getString(R.string.edit_wall)), 1);
+                    }
+                }).execute();
+
             }
         });
 
@@ -174,219 +217,30 @@ public class WallsFragment extends ActionBarActivity {
             @Override
             public void onClick(View view) {
 
-                Picasso.with(context)
-                        .load(wall)
-                        .into(wallShareTarget);
-                waitOnConnectedDialog();
+                new DownloadBitmap(context, wall, destWallFile, new Callback<Pair<Uri, Bitmap>>() {
+                    @Override
+                    public void callback(Pair<Uri, Bitmap> object) {
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType("image/*");
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, object.first);
+                        WallsFragment.this.startActivityForResult(Intent.createChooser(shareIntent, "Share Via"), ACTIVITY_SHARE);
+                    }
+                }).execute();
+
             }
         });
     }
 
-    private void waitOnConnectedDialog() {
-        new SnackBar.Builder(this)
-                .withMessageId(R.string.wallpaper_downloading_wait)
-                .withActionMessageId(R.string.ok)
-                .withStyle(SnackBar.Style.ALERT)
-                .withDuration(SnackBar.SHORT_SNACK)
-                .show();
+    private void setFullScreen() {
+
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
+
     }
-
-    private com.squareup.picasso.Target target = new com.squareup.picasso.Target() {
-        @Override
-        public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-
-                    File file = new File(saveWallLocation, picName + convertWallName(wall) + ".png");
-                    if (file.exists()) {
-                        file.delete();
-                    }
-
-                    try {
-                        file.createNewFile();
-                        FileOutputStream ostream = new FileOutputStream(file);
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, ostream);
-                        ostream.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            })
-                    .start();
-        }
-
-        @Override
-        public void onBitmapFailed(Drawable errorDrawable) {
-            showNoPicDialog();
-        }
-
-        @Override
-        public void onPrepareLoad(Drawable placeHolderDrawable) {
-
-            if (placeHolderDrawable != null) {
-
-            }
-
-        }
-    };
-    private com.squareup.picasso.Target wallTarget = new com.squareup.picasso.Target() {
-        @Override
-        public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        WallpaperManager wm = WallpaperManager.getInstance(context);
-                        wm.setBitmap(bitmap);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            })
-                    .start();
-        }
-
-        @Override
-        public void onBitmapFailed(Drawable errorDrawable) {
-            showNoPicDialog();
-        }
-
-        @Override
-        public void onPrepareLoad(Drawable placeHolderDrawable) {
-
-            if (placeHolderDrawable != null) {
-
-            }
-
-        }
-    };
-
-    private com.squareup.picasso.Target wallShareTarget = new com.squareup.picasso.Target() {
-        @Override
-        public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-
-                        ImageView wall = (ImageView) findViewById(R.id.bigwall);
-                        Uri wallUri = getLocalBitmapUri(wall);
-                        if (wallUri != null) {
-                            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                            shareIntent.setType("image/*");
-                            shareIntent.putExtra(Intent.EXTRA_STREAM, wallUri);
-                            WallsFragment.this.startActivityForResult(Intent.createChooser(shareIntent, "Share Via"), ACTIVITY_SHARE);
-                        } else {
-
-                        }
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            })
-                    .start();
-        }
-
-        @Override
-        public void onBitmapFailed(Drawable errorDrawable) {
-            showNoPicDialog();
-        }
-
-        @Override
-        public void onPrepareLoad(Drawable placeHolderDrawable) {
-
-            if (placeHolderDrawable != null) {
-
-            }
-
-        }
-    };
-
-    private com.squareup.picasso.Target wallCropTarget = new com.squareup.picasso.Target() {
-        @Override
-        public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-
-                        ImageView wall = (ImageView) findViewById(R.id.bigwall);
-                        Uri wallUri = getLocalBitmapUri(wall);
-                        if (wallUri != null) {
-                            Intent setWall = new Intent(Intent.ACTION_ATTACH_DATA);
-                            setWall.setDataAndType(wallUri, "image/*");
-                            setWall.putExtra("png", "image/*");
-                            startActivityForResult(Intent.createChooser(setWall, getString(R.string.set_as)), 1);
-                        } else {
-
-                        }
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            })
-                    .start();
-        }
-
-        @Override
-        public void onBitmapFailed(Drawable errorDrawable) {
-            showNoPicDialog();
-        }
-
-        @Override
-        public void onPrepareLoad(Drawable placeHolderDrawable) {
-
-            if (placeHolderDrawable != null) {
-
-            }
-
-        }
-    };
-
-    private com.squareup.picasso.Target wallEditTarget = new com.squareup.picasso.Target() {
-        @Override
-        public void onBitmapLoaded(final Bitmap bitmap, Picasso.LoadedFrom from) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-
-                        ImageView wall = (ImageView) findViewById(R.id.bigwall);
-                        Uri wallUri = getLocalBitmapUri(wall);
-                        if (wallUri != null) {
-                            Intent editWall = new Intent(Intent.ACTION_EDIT);
-                            editWall.setDataAndType(wallUri, "image/*");
-                            editWall.putExtra("png", "image/*");
-                            startActivityForResult(Intent.createChooser(editWall, getString(R.string.edit_wall)), 1);
-                        } else {
-
-                        }
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            })
-                    .start();
-        }
-
-        @Override
-        public void onBitmapFailed(Drawable errorDrawable) {
-            showNoPicDialog();
-        }
-
-        @Override
-        public void onPrepareLoad(Drawable placeHolderDrawable) {
-
-            if (placeHolderDrawable != null) {
-
-            }
-
-        }
-    };
 
     private String convertWallName(String link) {
         return (link
@@ -399,137 +253,16 @@ public class WallsFragment extends ActionBarActivity {
                 .replaceAll("\\p{Z}", "_"));
     }
 
-    public void showDownloadDialog(boolean indeterminate) {
 
-        if (indeterminate) {
-            new MaterialDialog.Builder(this)
-                    .title(R.string.progress_dialog_title)
-                    .content(R.string.please_wait)
-                    .progress(true, 0)
-                    .show();;
-            scan(this, "external");
-        } else {
-            new MaterialDialog.Builder(this)
-                    .title(R.string.progress_dialog_title)
-                    .content(R.string.please_wait)
-                    .progress(false, 120)
-                    .showListener(new DialogInterface.OnShowListener() {
-                        @Override
-                        public void onShow(DialogInterface dialogInterface) {
-                            final MaterialDialog dialog = (MaterialDialog) dialogInterface;
-                            new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    while (dialog.getCurrentProgress() != dialog.getMaxProgress()) {
-                                        if (dialog.isCancelled())
-                                            break;
-                                        try {
-                                            Thread.sleep(50);
-                                        } catch (InterruptedException e) {
-                                            break;
-                                        }
-                                        runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                dialog.incrementProgress(1);
-                                            }
-                                        });
-                                    }
-                                    runOnUiThread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            dialog.setTitle(getString(R.string.done));
-                                            dialog.setContent(dialogContent);
-                                            dialog.setActionButton(DialogAction.NEGATIVE, R.string.close);
-                                        }
-                                    });
-                                }
-                            }).start();
-                        }
-                    }).show();
-            scan(this, "external");
-        }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        setFullScreen();
     }
 
-    public void showSetWallDialog() {
-        new MaterialDialog.Builder(this)
-                .title(R.string.set_wall_title)
-                .content(R.string.set_wall_content)
-                .positiveText(R.string.yes)
-                .negativeText(R.string.no)
-                .callback(new MaterialDialog.ButtonCallback() {
-                    @Override
-                    public void onPositive(MaterialDialog dialog) {
-
-                        showSettingWallDialog(false);
-
-                        Picasso.with(context)
-                                .load(wall)
-                                .into(wallTarget);
-
-                    }
-                })
-                .show();
-        scan(this, "external");
-    }
-
-    public void showSettingWallDialog(boolean indeterminate) {
-        if (indeterminate) {
-            new MaterialDialog.Builder(this)
-                    .title(R.string.setting_wall_title)
-                    .content(R.string.please_wait)
-                    .progress(true, 0)
-                    .show();
-                     scan(this, "external");
-        } else {
-            new MaterialDialog.Builder(this)
-                    .title(R.string.setting_wall_title)
-                    .content(R.string.please_wait)
-                    .progress(false, 60)
-                    .showListener(new DialogInterface.OnShowListener() {
-                        @Override
-                        public void onShow(DialogInterface dialogInterface) {
-                            final MaterialDialog dialog = (MaterialDialog) dialogInterface;
-                            new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    while (dialog.getCurrentProgress() != dialog.getMaxProgress()) {
-                                        if (dialog.isCancelled())
-                                            break;
-                                        try {
-                                            Thread.sleep(50);
-                                        } catch (InterruptedException e) {
-                                            break;
-                                        }
-                                        runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                dialog.incrementProgress(1);
-                                            }
-                                        });
-                                    }
-                                    runOnUiThread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            dialog.setTitle(getString(R.string.done));
-                                            dialog.setContent(getString(R.string.set_as_wall_done));
-                                            dialog.setActionButton(DialogAction.NEGATIVE, R.string.close);
-                                        }
-                                    });
-                                }
-                            }).start();
-                        }
-                    }).show();
-            scan(this, "external");
-        }
-    }
-
-    private void showNoPicDialog() {
-        new MaterialDialog.Builder(this)
-                .title(R.string.error)
-                .content(R.string.wall_error)
-                .positiveText(R.string.ok)
-                .show();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        setFullScreen();
     }
 
     private static void scan(Context context, String volume) {
@@ -537,36 +270,68 @@ public class WallsFragment extends ActionBarActivity {
         args.putString("volume", volume);
         context.startService(
                 new Intent().
-        setComponent(new ComponentName("com.android.providers.media", "com.android.providers.media.MediaScannerService")).
-        putExtras(args));
+                        setComponent(new ComponentName("com.android.providers.media", "com.android.providers.media.MediaScannerService")).
+                        putExtras(args));
     }
 
-    public Uri getLocalBitmapUri(ImageView imageView) {
-        Drawable drawable = imageView.getDrawable();
-        Bitmap bmp = null;
+    private static class DownloadBitmap extends AsyncTask<Void, Void, Pair<Uri, Bitmap>> {
 
-        if (drawable instanceof BitmapDrawable) {
-            bmp = ((BitmapDrawable) imageView.getDrawable()).getBitmap();
-        } else {
-            return null;
+        private WeakReference<Activity> activity;
+        private String url;
+        private File dest;
+        private Callback<Pair<Uri, Bitmap>> callback;
+
+        public DownloadBitmap(Activity activity, String url, File dest, Callback<Pair<Uri, Bitmap>> callback) {
+            this.url = url;
+            this.dest = dest;
+            this.activity = new WeakReference<>(activity);
+            this.callback = callback;
         }
 
-        Uri bmpUri = null;
-        try {
-            File file = new File(saveWallLocation, picName + convertWallName(wall) + ".png");
-            file.getParentFile().mkdirs();
-            if (file.exists()) {
-                file.delete();
+        @Override
+        protected void onPreExecute() {
+            new SnackBar.Builder(activity.get())
+                    .withMessageId(R.string.wallpaper_downloading_wait)
+                    .withActionMessageId(R.string.ok)
+                    .withStyle(SnackBar.Style.ALERT)
+                    .withDuration(SnackBar.SHORT_SNACK)
+                    .show();
+        }
+
+        @Override
+        protected Pair<Uri, Bitmap> doInBackground(Void... params) {
+
+            Bitmap bitmap = null;
+            Uri uri = null;
+
+            try {
+
+                bitmap = Picasso.with(activity.get()).load(url).get();
+
+                dest.getParentFile().mkdirs();
+                if (dest.exists()) {
+                    dest.delete();
+                }
+                FileOutputStream out = new FileOutputStream(dest);
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                out.close();
+
+                uri = Uri.fromFile(dest);
+
+                scan(activity.get(), "external");
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            FileOutputStream out = new FileOutputStream(file);
-            bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
-            out.close();
-            bmpUri = Uri.fromFile(file);
-        } catch (IOException e) {
-            e.printStackTrace();
-            ;
+
+
+            return new Pair<>(uri, bitmap);
         }
-        return bmpUri;
+
+        @Override
+        protected void onPostExecute(Pair<Uri, Bitmap> uriBitmapPair) {
+            callback.callback(uriBitmapPair);
+        }
     }
 
 }
