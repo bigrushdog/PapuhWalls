@@ -8,13 +8,16 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
+import android.graphics.Point;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Pair;
+import android.view.Display;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -91,8 +94,12 @@ public class WallsFragment extends ActionBarActivity {
         wall = getIntent().getStringExtra("wall");
         destWallFile = new File(saveWallLocation + "/" + picName + convertWallName(wall) + ".png");
 
+        final Point displySize = getDisplaySize(getWindowManager().getDefaultDisplay());
+        final int size = (int) Math.ceil(Math.sqrt(displySize.x * displySize.y));
         Picasso.with(this)
                 .load(wall)
+                .resize(size, size)
+                .centerCrop()
                 .into(image);
 
         final FloatingActionsMenu wallsFab = (FloatingActionsMenu) findViewById(R.id.wall_actions);
@@ -242,6 +249,20 @@ public class WallsFragment extends ActionBarActivity {
 
     }
 
+    public Point getDisplaySize(Display display) {
+        Point size = new Point();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
+            display.getSize(size);
+        } else {
+            int width = display.getWidth();
+            int height = display.getHeight();
+            size = new Point(width, height);
+        }
+
+        return size;
+    }
+
     private String convertWallName(String link) {
         return (link
                 .replaceAll("png", "")
@@ -252,7 +273,6 @@ public class WallsFragment extends ActionBarActivity {
                 .replaceFirst("^[0-9]+(?!$)", "")
                 .replaceAll("\\p{Z}", "_"));
     }
-
 
     @Override
     protected void onResume() {
