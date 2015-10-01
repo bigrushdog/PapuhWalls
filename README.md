@@ -27,7 +27,7 @@ http://creativecommons.org/licenses/by-sa/4.0/
 Currently, Papuh is only available via the playstore but plans to add it to the amazon app store and other
 stores have been made.
 
-<a href="https://play.google.com/store/apps/details?id=com.alexcruz.papuh">
+<a href="https://play.google.com/store/apps/details?id=com.alexcruz.papuhwalls">
   <img alt="Get it on Google Play"
        src="https://developer.android.com/images/brand/en_generic_rgb_wo_60.png" />
 </a>
