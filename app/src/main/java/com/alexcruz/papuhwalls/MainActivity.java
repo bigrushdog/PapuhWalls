@@ -186,6 +186,7 @@ public class MainActivity extends ActionBarActivity  {
                 .withHeaderBackground(R.drawable.header)
                 .withSelectionFirstLine(getResources().getString(R.string.app_long_name))
                 .withSelectionSecondLine(getResources().getString(R.string.app_dev_name))
+                .withSelectionListEnabledForSingleProfile(false)
                 .addProfiles(
                         profile
                 )
@@ -706,8 +707,6 @@ public class MainActivity extends ActionBarActivity  {
             for (String s : children) {
                 if (!s.equals("lib")) {
                     deleteDir(new File(appDir, s));
-                } else {
-                    // Do absolutely NOTHING
                 }
             }
         }
