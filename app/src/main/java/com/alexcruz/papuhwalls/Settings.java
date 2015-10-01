@@ -34,16 +34,19 @@ public class Settings extends ActionBarActivity implements View.OnClickListener 
         toolbar.setTitleTextColor(getResources().getColor(R.color.white));
         setSupportActionBar(toolbar);
 
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
             toolbar.setBackgroundColor(Preferences.Theme());
             getWindow().getDecorView().setBackgroundColor(Preferences.Background());
             getWindow().setStatusBarColor(Preferences.Theme());
-            if (!Preferences.getNavigationTint()) {
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            if (Preferences.getNavigationTint()) {
                 getWindow().setNavigationBarColor(Preferences.NavBarTheme());
             }
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
             getWindow().setStatusBarColor(tint(Preferences.Theme(), 0.8));
         }
 

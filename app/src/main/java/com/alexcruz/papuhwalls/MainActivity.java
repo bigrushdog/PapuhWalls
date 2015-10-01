@@ -523,7 +523,7 @@ public class MainActivity extends ActionBarActivity  {
     public static int tint (int color, double factor) {
         int a = Color.alpha(color);
         int r = Color.red(color);
-        int g = Color.green( color );
+        int g = Color.green(color);
         int b = Color.blue(color);
 
         return Color.argb(a, Math.max( (int)(r * factor), 0 ), Math.max( (int)(g * factor), 0 ), Math.max( (int)(b * factor), 0 ) );
@@ -706,6 +706,8 @@ public class MainActivity extends ActionBarActivity  {
             for (String s : children) {
                 if (!s.equals("lib")) {
                     deleteDir(new File(appDir, s));
+                } else {
+                    // Do absolutely NOTHING
                 }
             }
         }
