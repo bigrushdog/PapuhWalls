@@ -99,6 +99,7 @@ public class WallsFragment extends ActionBarActivity {
         Picasso.with(this)
                 .load(wall)
                 .resize(size, size)
+                .fit()
                 .centerCrop()
                 .into(image);
 
