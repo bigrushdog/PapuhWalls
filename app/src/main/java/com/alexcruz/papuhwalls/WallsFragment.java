@@ -93,6 +93,8 @@ public class WallsFragment extends ActionBarActivity {
 
         Picasso.with(this)
                 .load(wall)
+                .fit()
+                .centerCrop()
                 .into(image);
 
         final FloatingActionsMenu wallsFab = (FloatingActionsMenu) findViewById(R.id.wall_actions);
